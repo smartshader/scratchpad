@@ -1,0 +1,25 @@
+.parent {
+    background-color: aqua;
+    padding: 1rem;
+    margin: 10px;
+    position: relative;
+    height: 200vh;
+}
+
+.child-one {
+    background-color: greenyellow;
+    position: sticky;
+    top: 0;
+}
+
+.child-two {
+    background-color: red;
+}
+
+.child-three {
+    background-color: plum;
+}
+
+.child {
+    padding: 1rem;
+}
