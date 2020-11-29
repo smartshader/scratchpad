@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"log"
 	"micro/models"
 	"net/http"
-	"regexp"
 	"strconv"
+
+	"github.com/gorilla/mux"
 )
 
 type Products struct {
@@ -18,23 +20,7 @@ func NewProducts(log *log.Logger) *Products {
 	}
 }
 
-func (h *Products) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		h.getProducts(w, r)
-		return
-	case http.MethodPost:
-		h.addProduct(w, r)
-		return
-	case http.MethodPut:
-		h.updateProduct(w, r)
-		return
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-	}
-}
-
-func (h *Products) getProducts(w http.ResponseWriter, r *http.Request) {
+func (h *Products) GetProducts(w http.ResponseWriter, r *http.Request) {
 	h.log.Println("Handle GET Products")
 
 	lp := models.GetProducts()
@@ -47,57 +33,29 @@ func (h *Products) getProducts(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Products) addProduct(w http.ResponseWriter, r *http.Request) {
+func (h *Products) AddProduct(w http.ResponseWriter, r *http.Request) {
 	h.log.Println("Handle POST Product")
 
-	product := &models.Product{}
-
-	err := product.FromJSON(r.Body)
-	if err != nil {
-		http.Error(w, "Unable to unmarshal json", http.StatusBadRequest)
-		return
-	}
+	product := r.Context().Value(KeyProduct{}).(models.Product)
 
 	h.log.Printf("Product: %#v", product)
 
-	models.AddProduct(product)
+	models.AddProduct(&product)
 }
 
-func (h *Products) updateProduct(w http.ResponseWriter, r *http.Request) {
+func (h *Products) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	h.log.Println("Handle PUT Product")
 
-	x := regexp.MustCompile("/([0-9]+)")
-	g := x.FindAllStringSubmatch(r.URL.Path, -1)
-
-	if len(g) != 1 {
-		h.log.Println("Invalid URI more than one id")
-		http.Error(w, "Invalid URI", http.StatusBadRequest)
-		return
-	}
-
-	if len(g[0]) != 2 {
-		h.log.Println("Invalid URI more than two capture groups")
-		http.Error(w, "Invalid URI", http.StatusBadRequest)
-		return
-	}
-
-	idString := g[0][1]
-	id, err := strconv.Atoi(idString)
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		h.log.Println("Unable to convert to number")
-		http.Error(w, "Invalid URI", http.StatusBadRequest)
+		http.Error(w, "Unable to convert id", http.StatusBadRequest)
 		return
 	}
 
-	product := &models.Product{}
+	product := r.Context().Value(KeyProduct{}).(models.Product)
 
-	err = product.FromJSON(r.Body)
-	if err != nil {
-		http.Error(w, "Unable to unmarshal json", http.StatusBadRequest)
-		return
-	}
-
-	err = models.UpdateProduct(id, product)
+	err = models.UpdateProduct(id, &product)
 	if err == models.ErrProductNotFound {
 		http.Error(w, "Product not found", http.StatusNotFound)
 		return
@@ -107,4 +65,24 @@ func (h *Products) updateProduct(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error updating product", http.StatusInternalServerError)
 		return
 	}
+}
+
+type KeyProduct struct {}
+
+func (h *Products) MiddlewareProductValidation(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		product := models.Product{}
+
+		err := product.FromJSON(r.Body)
+		if err != nil {
+			h.log.Println("[Error] deserializing product", err)
+			http.Error(w, "Error reading product", http.StatusBadRequest)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), KeyProduct{}, product)
+		req := r.WithContext(ctx)
+
+		next.ServeHTTP(w, req)
+	})
 }
