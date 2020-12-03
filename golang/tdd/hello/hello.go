@@ -1,5 +1,11 @@
 package hello
 
+const helloPrefix = "hello, "
+
 func hello(name string) string {
-	return "hello, " + name
+	if name == "" {
+		name = "world"
+	}
+
+	return helloPrefix + name
 }
