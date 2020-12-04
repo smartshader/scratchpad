@@ -1,11 +1,20 @@
 package iteration
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func BenchmarkRepeatChar(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		RepeatChar("a", 10)
 	}
+}
+
+func ExampleRepeatChar() {
+	repeated := RepeatChar("f", 3)
+	fmt.Println(repeated)
+	// Output: fff
 }
 
 func TestRepeatChar(t *testing.T) {
